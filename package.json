@@ -1,0 +1,18 @@
+{
+    "name": "node-npm-intro",
+    "version": "1.0.0",
+    "description": "",
+    "license": "ISC",
+    "author": "David",
+    "type": "module",
+    "main": "app.js",
+    "scripts": {
+        "start": "node --env-file=.env app.js",
+        "dev": "node --env-file=.env --watch app.js"
+    },
+    "dependencies": {
+        "chalk": "^5.6.2",
+        "express": "^4.22.1",
+        "mysql2": "^3.16.1"
+    }
+}
