@@ -10,7 +10,7 @@ const router = express.Router();
 router.get("/", index);
 
 // SHOW
-router.get("/:id", verificaOrarioApertura, show);
+router.get("/:id", show);
 
 // STORE
 router.post("/", store);

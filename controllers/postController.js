@@ -2,19 +2,23 @@ import { posts } from "../data.js"
 import connection from "../database/db.js";
 
 function index(req, res) {
-    let filteredPosts = posts;
     const tag = req.query.tag;
+    let sql = "SELECT * FROM posts";
+    let params = [];
     if (tag) {
-        filteredPosts = posts.filter(post => Array.isArray(post.tags) && post.tags.includes(tag));
+        sql += " WHERE JSON_CONTAINS(tags, '" + JSON.stringify(tag) + "')";
     }
-    const risposta = {
-        count: filteredPosts.length,
-        results: filteredPosts
-    };
-    res.json(risposta);
+    connection.query(sql, params, (err, results) => {
+        if (err) {
+            return res.status(500).json({ error: "Errore nel recupero dei post", details: err });
+        }
+        res.json({
+            count: results.length,
+            results: results
+        });
+    });
 }
 function show(req, res) {
-
     const id = parseInt(req.params.id);
     if (isNaN(id) || id < 0) {
         return res.status(404).json({
@@ -23,15 +27,35 @@ function show(req, res) {
             descrizione: "L'id fornito non è valido."
         });
     }
-    const resp = posts.find(game => game.id === id);
-    if (!resp) {
-        return res.status(404).json({
-            errore: "PostNonTrovato",
-            numero_errore: 404,
-            descrizione: "Nessun post trovato con l'id fornito."
-        });
-    }
-    res.json(resp);
+    // Recupera il post e i tag associati tramite JOIN
+    const sql = `
+        SELECT p.*, t.id AS tag_id, t.name AS tag_name
+        FROM posts p
+        LEFT JOIN post_tags pt ON p.id = pt.post_id
+        LEFT JOIN tags t ON pt.tag_id = t.id
+        WHERE p.id = ?
+    `;
+    connection.query(sql, [id], (err, results) => {
+        if (err) {
+            return res.status(500).json({ errore: "Errore nel recupero del post", details: err });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({
+                errore: "PostNonTrovato",
+                numero_errore: 404,
+                descrizione: "Nessun post trovato con l'id fornito."
+            });
+        }
+        // Ricostruisce il post con i tag
+        const post = {
+            id: results[0].id,
+            title: results[0].title,
+            content: results[0].content,
+            path: results[0].path,
+            tags: results[0].tag_id ? results.map(r => ({ id: r.tag_id, name: r.tag_name })) : []
+        };
+        res.json(post);
+    });
 }
 
 
@@ -90,6 +114,7 @@ function modify(req, res) {
     res.send("aggiorna parzialmente post n." + id);
 }
 
+
 function destroy(req, res) {
     const id = parseInt(req.params.id);
     if (isNaN(id) || id < 0) {
@@ -99,15 +124,19 @@ function destroy(req, res) {
             descrizione: "L'id fornito non è valido."
         });
     }
-    const post = posts.find(post => post.id === id);
-    if (!post) {
-        return res.status(404).json({
-            errore: "PostNonTrovato",
-            numero_errore: 404,
-            descrizione: "Nessun post trovato con l'id fornito."
-        });
-    }
-    res.send("cancella post n." + id);
+    connection.query("DELETE FROM posts WHERE id = ?", [id], (err, result) => {
+        if (err) {
+            return res.status(500).json({ errore: "Errore eliminazione", details: err });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                errore: "PostNonTrovato",
+                numero_errore: 404,
+                descrizione: "Nessun post trovato con l'id fornito."
+            });
+        }
+        res.status(204).send();
+    });
 }
 
 export { index, show, store, update, modify, destroy };
